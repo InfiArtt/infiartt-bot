@@ -1,0 +1,107 @@
+# Tests the bot, then deploys it to Cloudflare Workers and points the
+# Telegram bot at it. Until the Cloudflare secrets exist, only the tests run.
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check for Cloudflare credentials
+        id: creds
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set yet, so nothing was deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.creds.outputs.ready == 'true'
+      - uses: actions/setup-node@v7
+        if: steps.creds.outputs.ready == 'true'
+        with:
+          node-version: lts/*
+      - run: npm ci
+        if: steps.creds.outputs.ready == 'true'
+
+      - name: Deploy the Worker
+        id: deploy
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          npx wrangler deploy | tee deploy.log
+          url="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -n 1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the Worker's secrets
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          GITHUB_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+          GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
+        run: |
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET GITHUB_WEBHOOK_SECRET GH_READ_TOKEN TELEGRAM_CHAT_ID ALLOWED_USER_IDS; do
+            value="${!name:-}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx wrangler secret put "$name" > /dev/null
+              echo "Set $name"
+            else
+              echo "::notice::$name is not set yet."
+            fi
+          done
+
+      - name: Point the Telegram bot at the Worker
+        if: steps.creds.outputs.ready == 'true' && steps.deploy.outputs.url != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_WEBHOOK_SECRET" ]; then
+            echo "::notice::The Telegram secrets are not set yet; the webhook was not registered."
+            exit 0
+          fi
+          curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
+            --data-urlencode "url=${URL}/telegram" \
+            --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
+            --data-urlencode 'allowed_updates=["message"]' > /dev/null
+          echo "Telegram webhook set to ${URL}/telegram"
+
+      - name: Summary
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          echo "Deployed to ${URL:-an unknown URL}" >> "$GITHUB_STEP_SUMMARY"
+          echo "GitHub organization webhook URL: ${URL}/github" >> "$GITHUB_STEP_SUMMARY"

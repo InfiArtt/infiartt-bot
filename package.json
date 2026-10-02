@@ -1,0 +1,13 @@
+{
+  "name": "infiartt-bot",
+  "private": true,
+  "type": "module",
+  "description": "InfiArtt's Telegram bot: important GitHub events and NVDA add-on status, on Cloudflare Workers.",
+  "scripts": {
+    "test": "node --test",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.146.0"
+  }
+}

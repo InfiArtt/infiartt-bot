@@ -1,0 +1,14 @@
+name = "infiartt-bot"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Not a secret: the organization the bot watches.
+[vars]
+GITHUB_ORG = "InfiArtt"
+
+# Checks the NVDA Add-on Store every 30 minutes.
+[triggers]
+crons = ["*/30 * * * *"]
+
+[observability]
+enabled = true
