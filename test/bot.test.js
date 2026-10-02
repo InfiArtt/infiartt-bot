@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 import { addonStatus, findAddonRepos, formatAddonStatus, isCompatible, latestStableNvda } from "../src/addons.js";
 import { messageForEvent } from "../src/events.js";
-import { makeGitHub } from "../src/github.js";
+import { makeGitHub, nextLink } from "../src/github.js";
 import worker, { verifyGitHubSignature } from "../src/index.js";
 import { collectStoreNews, INTERVAL_MS } from "../src/scheduled.js";
 import { handleUpdate } from "../src/telegram.js";
@@ -228,6 +228,33 @@ test("a GitHub failure gives a friendly message instead of silence", async () =>
 	const { fetchImpl, sent } = fakeFetch([[/^\/orgs\//, () => { throw new Error("boom"); }]]);
 	await handleUpdate(update("/status"), ENV, { gh: makeGitHub("t", fetchImpl), fetchImpl });
 	assert.match(sent[0].text, /gagal mengambil data/);
+});
+
+test("a failed GitHub request is named in the message", async () => {
+	const fetchImpl = async (url, init) => {
+		if (url.startsWith("https://api.telegram.org/")) { fetchImpl.sent.push(JSON.parse(init.body).text); return new Response("{}"); }
+		return new Response("{}", { status: 403 });
+	};
+	fetchImpl.sent = [];
+	await handleUpdate(update("/status"), ENV, { gh: makeGitHub("t", fetchImpl), fetchImpl });
+	assert.match(fetchImpl.sent[0], /gagal mengambil data dari GitHub \(\/orgs\/InfiArtt\/[a-z-]+\/alerts|repos: 403\)/);
+	assert.doesNotMatch(fetchImpl.sent[0], /per_page|token/, "no query string or secrets in the message");
+});
+
+test("lists follow the Link header, never the page parameter", async () => {
+	assert.equal(nextLink('<https://api.github.com/x?after=abc>; rel="next", <https://api.github.com/x?before=z>; rel="prev"'), "https://api.github.com/x?after=abc");
+	assert.equal(nextLink(null), null);
+	const seen = [];
+	const fetchImpl = async (url) => {
+		seen.push(url);
+		if (/[?&]page=/.test(url)) return new Response('{"message":"Pagination using the page parameter is not supported."}', { status: 400 });
+		if (url.includes("after=2")) return new Response(JSON.stringify([{ n: 3 }]));
+		return new Response(JSON.stringify([{ n: 1 }, { n: 2 }]), { headers: { Link: '<https://api.github.com/orgs/InfiArtt/dependabot/alerts?per_page=100&after=2>; rel="next"' } });
+	};
+	const items = await makeGitHub("t", fetchImpl).all("/orgs/InfiArtt/dependabot/alerts?state=open");
+	assert.deepEqual(items.map((i) => i.n), [1, 2, 3]);
+	assert.equal(seen.length, 2);
+	assert.ok(seen.every((u) => !/[?&]page=/.test(u)));
 });
 
 // ------------------------------------------------------------------ scheduled store news

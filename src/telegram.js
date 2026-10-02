@@ -130,6 +130,8 @@ export async function handleUpdate(update, env, { gh, fetchImpl = fetch } = {}) 
 		}
 	} catch (error) {
 		console.error("command failed", command, error);
-		await reply("❌ Maaf, gagal mengambil data dari GitHub. Coba lagi sebentar lagi.");
+		// Name the failing request, so a problem can be traced from the group.
+		const where = error.path ? ` (${escapeHtml(error.path)}: ${error.status})` : "";
+		await reply(`❌ Maaf, gagal mengambil data dari GitHub${where}. Coba lagi sebentar lagi.`);
 	}
 }
