@@ -29,9 +29,27 @@ export async function findAddonRepos(gh, org) {
 			name,
 			summary: field(buildVars, "addon_summary") || name,
 			version: field(buildVars, "addon_version"),
+			minimumNVDA: field(buildVars, "addon_minimumNVDAVersion"),
+			lastTestedNVDA: field(buildVars, "addon_lastTestedNVDAVersion"),
 		});
 	}
 	return addons;
+}
+
+/** "2026.1" or "2026.1.1" -> {major, minor, patch}, as the store writes versions. */
+export function toApiVersion(text) {
+	const m = String(text ?? "").match(/^(\d+)\.(\d+)(?:\.(\d+))?$/);
+	return m ? { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3] ?? 0) } : null;
+}
+
+/**
+ * The NVDA versions an add-on declares in its repository, shaped like a
+ * store entry, for add-ons that are not in the store yet.
+ */
+export function entryFromBuildVars(addon) {
+	const minNVDAVersion = toApiVersion(addon.minimumNVDA);
+	const lastTestedVersion = toApiVersion(addon.lastTestedNVDA);
+	return minNVDAVersion && lastTestedVersion ? { minNVDAVersion, lastTestedVersion } : null;
 }
 
 /** Versions of an add-on published in the store, oldest first. */

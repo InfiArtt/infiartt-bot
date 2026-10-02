@@ -44,6 +44,17 @@ export function makeGitHub(token, fetchImpl = fetch) {
 		/** File contents as text, or null when the file does not exist. */
 		raw: (path) => request(path, { raw: true }),
 		/**
+		 * When this token expires, as an ISO date, or null if it never does.
+		 * /rate_limit doesn't count against the rate limit.
+		 */
+		async tokenExpiry() {
+			const res = await send("/rate_limit", false);
+			const header = res.headers.get("github-authentication-token-expiration");
+			if (!header) return null;
+			// "2027-10-03 03:55:09 UTC" -> "2027-10-03T03:55:09Z"
+			return header.trim().replace(" UTC", "Z").replace(" ", "T");
+		},
+		/**
 		 * Every item of a list endpoint, up to `maxPages` pages. Follows the
 		 * Link header rather than numbering pages: some endpoints, such as an
 		 * organization's Dependabot alerts, reject the `page` parameter.

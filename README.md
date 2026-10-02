@@ -20,14 +20,27 @@ From the NVDA Add-on Store, checked every 30 minutes:
 - New comments on, or the closing of, one of our submission issues.
 - A new NVDA release that makes one of our add-ons incompatible.
 
+On a schedule, within the same 30-minute cron:
+
+- Every Monday at 08:00 WIB (01:00 UTC): a weekly digest of new issues and pull requests, merges, releases, open security alerts and add-on status.
+- Every day at 09:00 WIB (02:00 UTC): a reminder when the bot's GitHub token expires in 30, 14, 7, 3, 1 or 0 days, and when the `InfiArtt/.github` workflow reports that `ORG_ADMIN_TOKEN` expires soon.
+
 ## Commands
 
-Only in the configured group. By default every member of that group may use them, since they only read data; set `ALLOWED_USERS` to limit them to certain people:
+Only in the configured group. By default every member of that group may use them, since they only read data; set `ALLOWED_USERS` to limit them to certain people. Each deploy also registers them as Telegram's "/" menu.
 
-- `/addons`: every NVDA add-on in the organization: latest release, version in the Add-on Store, pending submissions, VirusTotal result and compatibility with the latest stable NVDA.
-- `/status`: open secret alerts, high and critical vulnerabilities, and how many public repositories have a protected default branch.
-- `/bantuan`: help.
-- `/id`: shows the chat and user IDs, for setup.
+| Command | Shows |
+| :-- | :-- |
+| `/addons` | Every NVDA add-on in the organization: latest release, version in the Add-on Store, pending submissions, VirusTotal result, compatibility |
+| `/status` | Counts of open secret alerts and high or critical vulnerabilities, and protected public repositories |
+| `/keamanan` | Those alerts in detail, grouped by repository and package |
+| `/repo` | Every repository: last push, open issues and pull requests, protection |
+| `/pr` | Open pull requests across the organization, oldest first |
+| `/rilis` | Each repository's latest release |
+| `/nvda` | The latest stable and upcoming NVDA versions, and each add-on's compatibility (from `buildVars.py` until it is in the store) |
+| `/tim` | Teams, their members and repositories (the token needs Members: Read-only) |
+| `/bantuan` | Help |
+| `/id` | The chat and user IDs, for setup |
 
 ## Read-only towards the Add-on Store
 
@@ -42,7 +55,7 @@ Secrets, in this repository's **Settings > Secrets and variables > Actions**:
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token from the "Edit Cloudflare Workers" template |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
-| `GH_READ_TOKEN` | Fine-grained GitHub token, resource owner InfiArtt, all repositories, read-only: Contents, Administration, Dependabot alerts, Secret scanning alerts |
+| `GH_READ_TOKEN` | Fine-grained GitHub token, resource owner InfiArtt, all repositories, read-only: Contents, Administration, Dependabot alerts, Secret scanning alerts, Issues, Pull requests; organization: Members |
 | `TELEGRAM_WEBHOOK_SECRET` | Random string; Telegram sends it with every update |
 | `WEBHOOK_SECRET` | Random string; signs the GitHub organization webhook |
 | `TELEGRAM_CHAT_ID` | The group's ID (send `/id` in the group) |

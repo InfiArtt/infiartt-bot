@@ -1,5 +1,14 @@
 /** Telegram side: sending messages and answering commands in the group. */
-import { addonStatus, findAddonRepos, formatAddonStatus, latestStableNvda, nvdaVersions } from "./addons.js";
+import {
+	addonsReport,
+	nvdaReport,
+	prReport,
+	releasesReport,
+	repoReport,
+	securityReport,
+	statusReport,
+	teamsReport,
+} from "./reports.js";
 import { escapeHtml } from "./util.js";
 
 const LIMIT = 4000; // Telegram allows 4096 characters per message.
@@ -49,46 +58,26 @@ export function isAllowed(env, from) {
 	return allowed.includes(id) || (username !== "" && allowed.includes(username));
 }
 
+/** Commands, in the order /bantuan and Telegram's menu list them. */
+export const COMMANDS = [
+	{ name: "addons", description: "Status add-on NVDA: versi, Add-on Store, VirusTotal, kompatibilitas", run: addonsReport, slow: true },
+	{ name: "status", description: "Ringkasan keamanan dan perlindungan repo", run: statusReport },
+	{ name: "keamanan", description: "Rincian rahasia bocor dan library rentan per repo", run: securityReport },
+	{ name: "repo", description: "Semua repo: update terakhir, issue, PR, perlindungan", run: repoReport, slow: true },
+	{ name: "pr", description: "PR yang terbuka dan sudah berapa lama menunggu", run: prReport },
+	{ name: "rilis", description: "Rilis terbaru tiap repo", run: releasesReport, slow: true },
+	{ name: "nvda", description: "Versi NVDA terbaru dan kompatibilitas add-on", run: nvdaReport },
+	{ name: "tim", description: "Tim, anggotanya, dan repo yang mereka pegang", run: teamsReport },
+	{ name: "bantuan", description: "Daftar perintah" },
+];
+
 const HELP = [
 	"🤖 <b>Bot InfiArtt</b>",
 	"",
-	"/addons: status semua add-on NVDA (versi, Add-on Store, VirusTotal, kompatibilitas)",
-	"/status: ringkasan keamanan dan perlindungan repo",
-	"/bantuan: pesan ini",
+	...COMMANDS.map((c) => `/${c.name}: ${c.description}`),
 	"",
-	"Bot juga otomatis mengabari info penting: peringatan keamanan, perubahan repo dan anggota, dan kabar dari Add-on Store NVDA.",
+	"Otomatis: info keamanan dan perubahan repo/anggota secara langsung, kabar Add-on Store NVDA tiap 30 menit, ringkasan mingguan tiap Senin pagi, dan pengingat sebelum token kedaluwarsa.",
 ].join("\n");
-
-async function addonsReport(gh, org) {
-	const [addons, versions] = await Promise.all([findAddonRepos(gh, org), nvdaVersions(gh)]);
-	if (addons.length === 0) return "Belum ada repo add-on NVDA di InfiArtt.";
-	const nvda = latestStableNvda(versions);
-	const sections = [];
-	for (const addon of addons) {
-		sections.push(formatAddonStatus(await addonStatus(gh, org, addon, nvda)));
-	}
-	return `🛒 <b>Add-on NVDA InfiArtt</b>\n\n${sections.join("\n\n")}`;
-}
-
-async function statusReport(gh, org) {
-	const [secrets, vulns, repos] = await Promise.all([
-		gh.all(`/orgs/${org}/secret-scanning/alerts?state=open`, 2),
-		gh.all(`/orgs/${org}/dependabot/alerts?state=open&severity=critical,high`, 2),
-		gh.all(`/orgs/${org}/repos?type=public`),
-	]);
-	const active = repos.filter((r) => !r.archived);
-	let protectedCount = 0;
-	for (const repo of active) {
-		const rules = await gh.get(`/repos/${org}/${repo.name}/rulesets`);
-		if ((rules ?? []).some((r) => r.name === "Protect default branch" && r.enforcement === "active")) protectedCount++;
-	}
-	return [
-		"📊 <b>Status InfiArtt</b>",
-		`🔐 Rahasia bocor yang belum ditangani: ${secrets.length}`,
-		`🧩 Library rentan (tinggi/kritis): ${vulns.length}`,
-		`🛡️ Repo publik dengan branch utama terlindungi: ${protectedCount}/${active.length}`,
-	].join("\n");
-}
 
 /**
  * Handles one Telegram update. Commands are answered only in the configured
@@ -111,23 +100,19 @@ export async function handleUpdate(update, env, { gh, fetchImpl = fetch } = {}) 
 	if (!inGroup || !allowed) return;
 
 	const org = env.GITHUB_ORG;
+	const name = command.slice(1);
 	try {
-		switch (command) {
-			case "/start":
-			case "/bantuan":
-			case "/help":
-				await reply(HELP);
-				break;
-			case "/addons":
-				await reply("⏳ Mengecek add-on...");
-				await reply(await addonsReport(gh, org));
-				break;
-			case "/status":
-				await reply(await statusReport(gh, org));
-				break;
-			default:
-				await reply("Perintah tidak dikenal. Ketik /bantuan.");
+		if (["start", "bantuan", "help"].includes(name)) {
+			await reply(HELP);
+			return;
 		}
+		const entry = COMMANDS.find((c) => c.name === name && c.run);
+		if (!entry) {
+			await reply("Perintah tidak dikenal. Ketik /bantuan.");
+			return;
+		}
+		if (entry.slow) await reply("⏳ Sebentar, sedang mengecek...");
+		await reply(await entry.run(gh, org));
 	} catch (error) {
 		console.error("command failed", command, error);
 		// Name the failing request, so a problem can be traced from the group.

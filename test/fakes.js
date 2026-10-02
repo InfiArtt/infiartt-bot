@@ -27,6 +27,8 @@ export const BUILD_VARS = `addon_info = AddonInfo(
 	addon_name="AccessifyPlay",
 	addon_summary=_("Accessify Play"),
 	addon_version="1.12.1",
+	addon_minimumNVDAVersion="2025.1",
+	addon_lastTestedNVDAVersion="2026.1",
 )`;
 
 export const NVDA_VERSIONS = [

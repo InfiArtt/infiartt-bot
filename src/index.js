@@ -3,7 +3,8 @@
  *  - receives organization webhooks from GitHub (POST /github) and forwards
  *    the important ones to the team's Telegram group,
  *  - answers commands in that group (POST /telegram, Telegram webhook),
- *  - every 30 minutes, reports news about our NVDA add-ons in the Add-on Store.
+ *  - every 30 minutes, reports news about our NVDA add-ons in the Add-on Store,
+ *    plus a weekly digest on Mondays and daily token-expiry reminders.
  *
  * Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GITHUB_WEBHOOK_SECRET,
  * GH_READ_TOKEN (read-only), TELEGRAM_CHAT_ID, and optionally ALLOWED_USERS.
@@ -12,6 +13,7 @@
 import { findAddonRepos } from "./addons.js";
 import { messageForEvent } from "./events.js";
 import { makeGitHub } from "./github.js";
+import { tokenReminders, weeklyDigest } from "./reports.js";
 import { collectStoreNews } from "./scheduled.js";
 import { handleUpdate, sendMessage } from "./telegram.js";
 import { safeEqual } from "./util.js";
@@ -31,8 +33,29 @@ export async function handleGitHubDelivery(event, payload, env, gh) {
 	if (text) await sendMessage(env, text);
 }
 
+/**
+ * The single 30-minute cron also runs the daily and weekly jobs, at fixed
+ * times, so the Worker needs only one trigger:
+ *  - every day at 02:00 UTC (09:00 WIB): token reminders,
+ *  - every Monday at 01:00 UTC (08:00 WIB): the weekly digest.
+ */
+export function jobsAt(scheduledTime) {
+	const t = new Date(scheduledTime);
+	const onTheHour = t.getUTCMinutes() === 0;
+	return {
+		storeNews: true,
+		tokenReminders: onTheHour && t.getUTCHours() === 2,
+		weeklyDigest: onTheHour && t.getUTCHours() === 1 && t.getUTCDay() === 1,
+	};
+}
+
 export async function runScheduled(env, scheduledTime, gh) {
-	const messages = await collectStoreNews(gh, env.GITHUB_ORG, scheduledTime);
+	const org = env.GITHUB_ORG;
+	const jobs = jobsAt(scheduledTime);
+	const messages = [];
+	if (jobs.weeklyDigest) messages.push(await weeklyDigest(gh, org, scheduledTime));
+	if (jobs.tokenReminders) messages.push(...(await tokenReminders(gh, org, scheduledTime)));
+	messages.push(...(await collectStoreNews(gh, org, scheduledTime)));
 	for (const text of messages) await sendMessage(env, text);
 }
 

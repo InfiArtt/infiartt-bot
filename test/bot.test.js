@@ -130,7 +130,7 @@ test("an add-on release reminds to submit by hand, other releases are ignored", 
 test("add-on repos are found from buildVars.py", async () => {
 	const { fetchImpl } = fakeFetch(orgRoutes());
 	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
-	assert.deepEqual(addons, [{ repo: "accessify-play", name: "AccessifyPlay", summary: "Accessify Play", version: "1.12.1" }]);
+	assert.deepEqual(addons, [{ repo: "accessify-play", name: "AccessifyPlay", summary: "Accessify Play", version: "1.12.1", minimumNVDA: "2025.1", lastTestedNVDA: "2026.1" }]);
 });
 
 test("compatibility follows NVDA's rule", () => {

@@ -97,6 +97,11 @@ jobs:
             --data-urlencode "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
             --data-urlencode 'allowed_updates=["message"]' > /dev/null
           echo "Telegram webhook set to ${URL}/telegram"
+          # The "/" menu in Telegram, generated from the bot's own command list.
+          commands="$(node -e 'import("./src/telegram.js").then((m) => console.log(JSON.stringify(m.COMMANDS.map((c) => ({ command: c.name, description: c.description })))))')"
+          curl -fsS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setMyCommands" \
+            --data-urlencode "commands=${commands}" > /dev/null
+          echo "Telegram command menu updated"
 
       - name: Summary
         if: steps.creds.outputs.ready == 'true'
