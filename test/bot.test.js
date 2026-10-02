@@ -18,7 +18,7 @@ const ENV = {
 	GITHUB_WEBHOOK_SECRET: "gh-secret",
 	GH_READ_TOKEN: "read-token",
 	TELEGRAM_CHAT_ID: "-100123",
-	ALLOWED_USER_IDS: "11, 22",
+	ALLOWED_USERS: "11, @Rexya",
 };
 
 // ------------------------------------------------------------------ util
@@ -173,8 +173,8 @@ test("a release that is not in the store and not submitted gets a reminder", () 
 });
 
 // ------------------------------------------------------------------ Telegram commands
-function update(text, { chat = -100123, from = 11 } = {}) {
-	return { message: { text, chat: { id: chat }, from: { id: from } } };
+function update(text, { chat = -100123, from = 11, username } = {}) {
+	return { message: { text, chat: { id: chat }, from: { id: from, username } } };
 }
 
 test("commands answer only in the group and only for allowed users", async () => {
@@ -186,6 +186,19 @@ test("commands answer only in the group and only for allowed users", async () =>
 	await handleUpdate(update("/bantuan@InfiArttBot"), ENV, { gh, fetchImpl });
 	assert.equal(sent.length, 1);
 	assert.match(sent[0].text, /\/addons/);
+});
+
+test("users are allowed by ID or by @username, and everyone in the group when no list is set", async () => {
+	const { fetchImpl, sent } = fakeFetch([]);
+	const gh = makeGitHub("t", fetchImpl);
+	await handleUpdate(update("/bantuan", { from: 44, username: "rexya" }), ENV, { gh, fetchImpl });
+	assert.equal(sent.length, 1, "username matches case-insensitively, with or without @");
+	await handleUpdate(update("/bantuan", { from: 55, username: "stranger" }), ENV, { gh, fetchImpl });
+	assert.equal(sent.length, 1, "someone not on the list is ignored");
+	await handleUpdate(update("/bantuan", { from: 55, username: "stranger" }), { ...ENV, ALLOWED_USERS: "" }, { gh, fetchImpl });
+	assert.equal(sent.length, 2, "no list: every member of the group may use commands");
+	await handleUpdate(update("/bantuan", { chat: 777, from: 55 }), { ...ENV, ALLOWED_USERS: "" }, { gh, fetchImpl });
+	assert.equal(sent.length, 2, "but never outside the configured group");
 });
 
 test("/id helps during setup but stays quiet elsewhere once configured", async () => {

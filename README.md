@@ -22,7 +22,7 @@ From the NVDA Add-on Store, checked every 30 minutes:
 
 ## Commands
 
-Only in the configured group, and only for the users in `ALLOWED_USER_IDS`:
+Only in the configured group. By default every member of that group may use them, since they only read data; set `ALLOWED_USERS` to limit them to certain people:
 
 - `/addons`: every NVDA add-on in the organization: latest release, version in the Add-on Store, pending submissions, VirusTotal result and compatibility with the latest stable NVDA.
 - `/status`: open secret alerts, high and critical vulnerabilities, and how many public repositories have a protected default branch.
@@ -46,7 +46,7 @@ Secrets, in this repository's **Settings > Secrets and variables > Actions**:
 | `TELEGRAM_WEBHOOK_SECRET` | Random string; Telegram sends it with every update |
 | `WEBHOOK_SECRET` | Random string; signs the GitHub organization webhook |
 | `TELEGRAM_CHAT_ID` | The group's ID (send `/id` in the group) |
-| `ALLOWED_USER_IDS` | Telegram user IDs allowed to use commands, comma-separated |
+| `ALLOWED_USERS` | Optional. Who may use commands: Telegram usernames (`@name`) and/or numeric user IDs, comma-separated. Empty means everyone in the group. IDs are stricter, since a username can change hands. |
 
 Every push to `main` runs the tests, deploys the Worker, uploads these secrets to it and points the Telegram bot at it. The GitHub organization webhook goes to `<worker URL>/github`, content type `application/json`, with the `WEBHOOK_SECRET`, for the events: Repositories, Organizations, Secret scanning alerts, Dependabot alerts and Releases.
 

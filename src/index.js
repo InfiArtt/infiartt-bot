@@ -6,7 +6,7 @@
  *  - every 30 minutes, reports news about our NVDA add-ons in the Add-on Store.
  *
  * Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GITHUB_WEBHOOK_SECRET,
- * GH_READ_TOKEN (read-only), TELEGRAM_CHAT_ID, ALLOWED_USER_IDS.
+ * GH_READ_TOKEN (read-only), TELEGRAM_CHAT_ID, and optionally ALLOWED_USERS.
  * Variable: GITHUB_ORG.
  */
 import { findAddonRepos } from "./addons.js";

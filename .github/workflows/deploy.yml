@@ -69,9 +69,9 @@ jobs:
           GITHUB_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
           GH_READ_TOKEN: ${{ secrets.GH_READ_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
+          ALLOWED_USERS: ${{ secrets.ALLOWED_USERS }}
         run: |
-          for name in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET GITHUB_WEBHOOK_SECRET GH_READ_TOKEN TELEGRAM_CHAT_ID ALLOWED_USER_IDS; do
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET GITHUB_WEBHOOK_SECRET GH_READ_TOKEN TELEGRAM_CHAT_ID ALLOWED_USERS; do
             value="${!name:-}"
             if [ -n "$value" ]; then
               printf '%s' "$value" | npx wrangler secret put "$name" > /dev/null

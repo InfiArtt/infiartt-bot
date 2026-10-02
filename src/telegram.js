@@ -27,10 +27,26 @@ export async function sendMessage(env, text, { chatId = env.TELEGRAM_CHAT_ID, fe
 	}
 }
 
+/** Entries of ALLOWED_USERS: Telegram user IDs and/or @usernames. */
 export function allowedUsers(env) {
-	return String(env.ALLOWED_USER_IDS ?? "")
+	return String(env.ALLOWED_USERS ?? env.ALLOWED_USER_IDS ?? "")
 		.split(/[\s,]+/)
-		.filter(Boolean);
+		.filter(Boolean)
+		.map((entry) => entry.replace(/^@/, "").toLowerCase());
+}
+
+/**
+ * Whether this sender may use commands. With no ALLOWED_USERS, everyone in
+ * the configured group may: the commands only read data, and the group's
+ * membership is already controlled by its admins. Usernames can change, so
+ * a numeric ID is the stricter choice when the group grows.
+ */
+export function isAllowed(env, from) {
+	const allowed = allowedUsers(env);
+	if (allowed.length === 0) return true;
+	const id = String(from?.id ?? "");
+	const username = String(from?.username ?? "").toLowerCase();
+	return allowed.includes(id) || (username !== "" && allowed.includes(username));
 }
 
 const HELP = [
@@ -84,7 +100,7 @@ export async function handleUpdate(update, env, { gh, fetchImpl = fetch } = {}) 
 	const command = msg.text.trim().split(/\s+/)[0].split("@")[0].toLowerCase();
 	const reply = (text) => sendMessage(env, text, { chatId: msg.chat.id, fetchImpl });
 	const inGroup = String(msg.chat.id) === String(env.TELEGRAM_CHAT_ID ?? "");
-	const allowed = allowedUsers(env).includes(String(msg.from?.id));
+	const allowed = isAllowed(env, msg.from);
 
 	if (command === "/id") {
 		// Lets the owners find the IDs during setup; silent once configured elsewhere.
