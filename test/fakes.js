@@ -31,6 +31,17 @@ export const BUILD_VARS = `addon_info = AddonInfo(
 	addon_lastTestedNVDAVersion="2026.1",
 )`;
 
+/** A manifest.ini written by hand, as in add-ons not made from NV Access's template. */
+export const MANIFEST_INI = `name = "nvdaMcp"
+summary = "NVDA MCP"
+version = "1.0.0"
+description = "Lets AI assistants read what NVDA reads."
+author = "InfiArtt <info@infiartt.com>"
+docFileName = "readme.html"
+minimumNVDAVersion = "2026.3"
+lastTestedNVDAVersion = "2026.3"
+`;
+
 export const NVDA_VERSIONS = [
 	{ description: "NVDA 2025.3", apiVer: { major: 2025, minor: 3, patch: 0 }, backCompatTo: { major: 2025, minor: 1, patch: 0 } },
 	{ description: "NVDA 2026.1", apiVer: { major: 2026, minor: 1, patch: 0 }, backCompatTo: { major: 2026, minor: 1, patch: 0 } },

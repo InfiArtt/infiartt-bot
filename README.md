@@ -37,7 +37,7 @@ Only in the configured group. By default every member of that group may use them
 | `/repo` | Every repository: last push, open issues and pull requests, protection |
 | `/pr` | Open pull requests across the organization, oldest first |
 | `/rilis` | Each repository's latest release |
-| `/nvda` | The latest stable and upcoming NVDA versions, and each add-on's compatibility (from `buildVars.py` until it is in the store) |
+| `/nvda` | The latest stable and upcoming NVDA versions, and each add-on's compatibility (from `buildVars.py` or `addon/manifest.ini` until it is in the store) |
 | `/tim` | Teams, their members and repositories (the token needs Members: Read-only) |
 | `/bantuan` | Help |
 | `/id` | The chat and user IDs, for setup |

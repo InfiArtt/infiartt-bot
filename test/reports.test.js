@@ -104,7 +104,7 @@ test("/nvda shows stable and upcoming NVDA, and add-on compatibility even before
 	const text = await nvdaReport(gh(orgRoutes([["/repos/nvaccess/addon-datastore/contents/addons/AccessifyPlay", 404]])), "InfiArtt");
 	assert.match(text, /Stabil terbaru: <b>NVDA 2026\.1<\/b>, add-on harus dites minimal di NVDA 2026\.1/);
 	assert.match(text, /Belum final: NVDA 2026\.3, minimal 2026\.1/);
-	assert.match(text, /Accessify Play 1\.12\.1 \(belum di toko, menurut buildVars\): 2026\.1 ✅, 2026\.3 ✅/);
+	assert.match(text, /Accessify Play 1\.12\.1 \(belum di toko, menurut repo\): 2026\.1 ✅, 2026\.3 ✅/);
 });
 
 test("/nvda uses the store's record once the add-on is published", async () => {
