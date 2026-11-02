@@ -9,7 +9,7 @@ import worker, { verifyGitHubSignature } from "../src/index.js";
 import { collectStoreNews, INTERVAL_MS } from "../src/scheduled.js";
 import { handleUpdate } from "../src/telegram.js";
 import { compareVersions, escapeHtml, parseVersion, safeEqual } from "../src/util.js";
-import { fakeFetch, MANIFEST_INI, NVDA_VERSIONS, orgRoutes, storeEntryJson } from "./fakes.js";
+import { BUILD_VARS, fakeFetch, MANIFEST_INI, NVDA_VERSIONS, orgRoutes, repoFiles, storeEntryJson } from "./fakes.js";
 
 const ENV = {
 	GITHUB_ORG: "InfiArtt",
@@ -134,12 +134,18 @@ test("add-on repos are found from buildVars.py", async () => {
 });
 
 test("add-on repos without buildVars.py are found from addon/manifest.ini", async () => {
-	const { fetchImpl } = fakeFetch([
-		["/orgs/InfiArtt/repos", [{ name: "nvda-mcp", archived: false }, { name: "TeamTalkBot", archived: false }]],
-		["/repos/InfiArtt/nvda-mcp/contents/addon/manifest.ini", MANIFEST_INI],
-	]);
+	const { fetchImpl } = fakeFetch([["/graphql", repoFiles([{ name: "nvda-mcp", addonManifest: MANIFEST_INI }, { name: "TeamTalkBot" }])]]);
 	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
 	assert.deepEqual(addons, [{ repo: "nvda-mcp", name: "nvdaMcp", summary: "NVDA MCP", version: "1.0.0", minimumNVDA: "2026.3", lastTestedNVDA: "2026.3" }]);
+});
+
+test("finding add-ons takes one request however many repositories there are", async () => {
+	// Cloudflare stops a Worker after 50 subrequests, Telegram replies included.
+	const repos = Array.from({ length: 60 }, (_, i) => ({ name: `repo-${i}` }));
+	const { fetchImpl, calls } = fakeFetch([["/graphql", repoFiles([...repos, { name: "accessify-play", buildVars: BUILD_VARS }])]]);
+	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
+	assert.deepEqual(addons.map((a) => a.repo), ["accessify-play"]);
+	assert.equal(calls.length, 1);
 });
 
 test("buildVars.py from the older template, written as a dictionary, is read too", async () => {
@@ -150,10 +156,7 @@ test("buildVars.py from the older template, written as a dictionary, is read too
 	"addon_minimumNVDAVersion": "2024.1",
 	"addon_lastTestedNVDAVersion": "2026.2",
 }`;
-	const { fetchImpl } = fakeFetch([
-		["/orgs/InfiArtt/repos", [{ name: "code-compass", archived: false }]],
-		["/repos/InfiArtt/code-compass/contents/buildVars.py", buildVars],
-	]);
+	const { fetchImpl } = fakeFetch([["/graphql", repoFiles([{ name: "code-compass", buildVars }])]]);
 	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
 	assert.deepEqual(addons, [{ repo: "code-compass", name: "codeCompass", summary: "Code Compass", version: "0.4.2", minimumNVDA: "2024.1", lastTestedNVDA: "2026.2" }]);
 });

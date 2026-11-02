@@ -22,11 +22,10 @@ function manifestField(source, name) {
 }
 
 /**
- * An add-on's details from its repository: buildVars.py for add-ons made from
- * NV Access's template, otherwise a manifest.ini written by hand.
+ * An add-on's details from its repository's files: buildVars.py for add-ons
+ * made from NV Access's template, otherwise a manifest.ini written by hand.
  */
-async function readAddon(gh, org, repo) {
-	const buildVars = await gh.raw(`/repos/${org}/${repo}/contents/buildVars.py`);
+export function addonFromFiles(repo, { buildVars, addonManifest, manifest }) {
 	const name = buildVars && field(buildVars, "addon_name");
 	if (name) {
 		return {
@@ -38,30 +37,56 @@ async function readAddon(gh, org, repo) {
 			lastTestedNVDA: field(buildVars, "addon_lastTestedNVDAVersion"),
 		};
 	}
-	for (const path of ["addon/manifest.ini", "manifest.ini"]) {
-		const manifest = await gh.raw(`/repos/${org}/${repo}/contents/${path}`);
-		const manifestName = manifest && manifestField(manifest, "name");
+	for (const source of [addonManifest, manifest]) {
+		const manifestName = source && manifestField(source, "name");
 		if (!manifestName) continue;
 		return {
 			repo,
 			name: manifestName,
-			summary: manifestField(manifest, "summary") || manifestName,
-			version: manifestField(manifest, "version"),
-			minimumNVDA: manifestField(manifest, "minimumNVDAVersion"),
-			lastTestedNVDA: manifestField(manifest, "lastTestedNVDAVersion"),
+			summary: manifestField(source, "summary") || manifestName,
+			version: manifestField(source, "version"),
+			minimumNVDA: manifestField(source, "minimumNVDAVersion"),
+			lastTestedNVDA: manifestField(source, "lastTestedNVDAVersion"),
 		};
 	}
 	return null;
 }
 
+/**
+ * Every repository with the files that can describe an add-on, 100 per
+ * request. One GraphQL request instead of several REST requests per
+ * repository keeps a command under the Worker's limit of 50 subrequests.
+ */
+const ADDON_FILES_QUERY = `query ($org: String!, $after: String) {
+	organization(login: $org) {
+		repositories(first: 100, after: $after, isArchived: false) {
+			pageInfo { hasNextPage endCursor }
+			nodes {
+				name
+				buildVars: object(expression: "HEAD:buildVars.py") { ... on Blob { text } }
+				addonManifest: object(expression: "HEAD:addon/manifest.ini") { ... on Blob { text } }
+				manifest: object(expression: "HEAD:manifest.ini") { ... on Blob { text } }
+			}
+		}
+	}
+}`;
+
 /** Every repository in the organization that builds an NVDA add-on. */
 export async function findAddonRepos(gh, org) {
-	const repos = await gh.all(`/orgs/${org}/repos?type=all`);
 	const addons = [];
-	for (const repo of repos) {
-		if (repo.archived) continue;
-		const addon = await readAddon(gh, org, repo.name);
-		if (addon) addons.push(addon);
+	let after = null;
+	for (let page = 0; page < 5; page++) {
+		const repos = (await gh.graphql(ADDON_FILES_QUERY, { org, after }))?.organization?.repositories;
+		for (const repo of repos?.nodes ?? []) {
+			const addon = addonFromFiles(repo.name, {
+				buildVars: repo.buildVars?.text,
+				addonManifest: repo.addonManifest?.text,
+				manifest: repo.manifest?.text,
+			});
+			if (addon) addons.push(addon);
+		}
+		if (!repos?.pageInfo?.hasNextPage) break;
+		after = repos.pageInfo.endCursor;
 	}
 	return addons;
 }
