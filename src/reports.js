@@ -201,7 +201,7 @@ export async function nvdaReport(gh, org) {
 			const published = await storeVersions(gh, addon.name);
 			const latest = published[published.length - 1];
 			const entry = latest ? await storeEntry(gh, addon.name, latest) : entryFromBuildVars(addon);
-			const label = latest ? `${addon.summary} ${latest}` : `${addon.summary} ${addon.version ?? ""} (belum di toko, menurut buildVars)`;
+			const label = latest ? `${addon.summary} ${latest}` : `${addon.summary} ${addon.version ?? ""} (belum di toko, menurut repo)`;
 			if (!entry) {
 				lines.push(`• ${escapeHtml(label)}: data versi NVDA tidak ditemukan`);
 				continue;

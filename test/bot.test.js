@@ -9,7 +9,7 @@ import worker, { verifyGitHubSignature } from "../src/index.js";
 import { collectStoreNews, INTERVAL_MS } from "../src/scheduled.js";
 import { handleUpdate } from "../src/telegram.js";
 import { compareVersions, escapeHtml, parseVersion, safeEqual } from "../src/util.js";
-import { fakeFetch, NVDA_VERSIONS, orgRoutes, storeEntryJson } from "./fakes.js";
+import { fakeFetch, MANIFEST_INI, NVDA_VERSIONS, orgRoutes, storeEntryJson } from "./fakes.js";
 
 const ENV = {
 	GITHUB_ORG: "InfiArtt",
@@ -131,6 +131,31 @@ test("add-on repos are found from buildVars.py", async () => {
 	const { fetchImpl } = fakeFetch(orgRoutes());
 	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
 	assert.deepEqual(addons, [{ repo: "accessify-play", name: "AccessifyPlay", summary: "Accessify Play", version: "1.12.1", minimumNVDA: "2025.1", lastTestedNVDA: "2026.1" }]);
+});
+
+test("add-on repos without buildVars.py are found from addon/manifest.ini", async () => {
+	const { fetchImpl } = fakeFetch([
+		["/orgs/InfiArtt/repos", [{ name: "nvda-mcp", archived: false }, { name: "TeamTalkBot", archived: false }]],
+		["/repos/InfiArtt/nvda-mcp/contents/addon/manifest.ini", MANIFEST_INI],
+	]);
+	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
+	assert.deepEqual(addons, [{ repo: "nvda-mcp", name: "nvdaMcp", summary: "NVDA MCP", version: "1.0.0", minimumNVDA: "2026.3", lastTestedNVDA: "2026.3" }]);
+});
+
+test("buildVars.py from the older template, written as a dictionary, is read too", async () => {
+	const buildVars = `addon_info = {
+	"addon_name": "codeCompass",
+	"addon_summary": _("Code Compass"),
+	"addon_version": "0.4.2",
+	"addon_minimumNVDAVersion": "2024.1",
+	"addon_lastTestedNVDAVersion": "2026.2",
+}`;
+	const { fetchImpl } = fakeFetch([
+		["/orgs/InfiArtt/repos", [{ name: "code-compass", archived: false }]],
+		["/repos/InfiArtt/code-compass/contents/buildVars.py", buildVars],
+	]);
+	const addons = await findAddonRepos(makeGitHub("t", fetchImpl), "InfiArtt");
+	assert.deepEqual(addons, [{ repo: "code-compass", name: "codeCompass", summary: "Code Compass", version: "0.4.2", minimumNVDA: "2024.1", lastTestedNVDA: "2026.2" }]);
 });
 
 test("compatibility follows NVDA's rule", () => {

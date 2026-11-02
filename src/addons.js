@@ -9,9 +9,49 @@ import { compareApiVersions, compareVersions, escapeHtml, formatApiVersion } fro
 export const STORE = "nvaccess/addon-datastore";
 export const SUBMIT_FORM = `https://github.com/${STORE}/issues/new?template=registerAddon.yml`;
 
+/** A buildVars.py field, written as addon_name="x" (current template) or "addon_name": "x" (older template). */
 function field(source, name) {
-	const m = source.match(new RegExp(`${name}\\s*=\\s*(?:_\\(\\s*)?["']([^"'\\n]+)["']`));
+	const m = source.match(new RegExp(`["']?${name}["']?\\s*[=:]\\s*(?:_\\(\\s*)?["']([^"'\\n]+)["']`));
 	return m ? m[1] : null;
+}
+
+/** A key at the start of a line in an add-on's manifest.ini, such as name = "nvdaMcp". */
+function manifestField(source, name) {
+	const m = source.match(new RegExp(`^${name}\\s*=\\s*["']([^"'\\n]+)["']`, "m"));
+	return m ? m[1] : null;
+}
+
+/**
+ * An add-on's details from its repository: buildVars.py for add-ons made from
+ * NV Access's template, otherwise a manifest.ini written by hand.
+ */
+async function readAddon(gh, org, repo) {
+	const buildVars = await gh.raw(`/repos/${org}/${repo}/contents/buildVars.py`);
+	const name = buildVars && field(buildVars, "addon_name");
+	if (name) {
+		return {
+			repo,
+			name,
+			summary: field(buildVars, "addon_summary") || name,
+			version: field(buildVars, "addon_version"),
+			minimumNVDA: field(buildVars, "addon_minimumNVDAVersion"),
+			lastTestedNVDA: field(buildVars, "addon_lastTestedNVDAVersion"),
+		};
+	}
+	for (const path of ["addon/manifest.ini", "manifest.ini"]) {
+		const manifest = await gh.raw(`/repos/${org}/${repo}/contents/${path}`);
+		const manifestName = manifest && manifestField(manifest, "name");
+		if (!manifestName) continue;
+		return {
+			repo,
+			name: manifestName,
+			summary: manifestField(manifest, "summary") || manifestName,
+			version: manifestField(manifest, "version"),
+			minimumNVDA: manifestField(manifest, "minimumNVDAVersion"),
+			lastTestedNVDA: manifestField(manifest, "lastTestedNVDAVersion"),
+		};
+	}
+	return null;
 }
 
 /** Every repository in the organization that builds an NVDA add-on. */
@@ -20,18 +60,8 @@ export async function findAddonRepos(gh, org) {
 	const addons = [];
 	for (const repo of repos) {
 		if (repo.archived) continue;
-		const buildVars = await gh.raw(`/repos/${org}/${repo.name}/contents/buildVars.py`);
-		if (!buildVars) continue;
-		const name = field(buildVars, "addon_name");
-		if (!name) continue;
-		addons.push({
-			repo: repo.name,
-			name,
-			summary: field(buildVars, "addon_summary") || name,
-			version: field(buildVars, "addon_version"),
-			minimumNVDA: field(buildVars, "addon_minimumNVDAVersion"),
-			lastTestedNVDA: field(buildVars, "addon_lastTestedNVDAVersion"),
-		});
+		const addon = await readAddon(gh, org, repo.name);
+		if (addon) addons.push(addon);
 	}
 	return addons;
 }
