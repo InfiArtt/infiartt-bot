@@ -39,6 +39,25 @@ export function makeGitHub(token, fetchImpl = fetch) {
 	}
 
 	return {
+		/**
+		 * The data of a GraphQL query. Queries only read; POST is just how
+		 * GraphQL is called.
+		 */
+		async graphql(query, variables = {}) {
+			const res = await fetchImpl(`${API}/graphql`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+					"User-Agent": "infiartt-bot",
+				},
+				body: JSON.stringify({ query, variables }),
+			});
+			if (!res.ok) throw new GitHubError("/graphql", res.status);
+			const result = await res.json();
+			if (!result?.data && result?.errors?.length) throw new GitHubError("/graphql", result.errors[0].message);
+			return result?.data ?? null;
+		},
 		/** Parsed JSON, or null when the resource does not exist. */
 		get: (path) => request(path),
 		/** File contents as text, or null when the file does not exist. */

@@ -57,13 +57,35 @@ export function storeEntryJson({ lastTested = { major: 2026, minor: 1, patch: 0 
 	});
 }
 
+/**
+ * The GraphQL answer listing repositories and their add-on files, as
+ * findAddonRepos asks for them. Each repo is {name, buildVars?, addonManifest?, manifest?}.
+ */
+export function repoFiles(repos) {
+	const blob = (text) => (text === undefined ? null : { text });
+	return {
+		data: {
+			organization: {
+				repositories: {
+					pageInfo: { hasNextPage: false, endCursor: null },
+					nodes: repos.map((r) => ({
+						name: r.name,
+						buildVars: blob(r.buildVars),
+						addonManifest: blob(r.addonManifest),
+						manifest: blob(r.manifest),
+					})),
+				},
+			},
+		},
+	};
+}
+
 /** An organization with one add-on repo and one other repo. */
 export function orgRoutes(extra = []) {
 	return [
 		...extra,
 		["/orgs/InfiArtt/repos", [{ name: "accessify-play", archived: false }, { name: "TeamTalkBot", archived: false }]],
-		["/repos/InfiArtt/accessify-play/contents/buildVars.py", BUILD_VARS],
-		["/repos/InfiArtt/TeamTalkBot/contents/buildVars.py", 404],
+		["/graphql", repoFiles([{ name: "accessify-play", buildVars: BUILD_VARS }, { name: "TeamTalkBot" }])],
 		["/repos/nvaccess/addon-datastore/contents/transform/nvdaAPIVersions.json", JSON.stringify(NVDA_VERSIONS)],
 	];
 }
